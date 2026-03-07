@@ -3,24 +3,11 @@
 The **NovaShield** SDK is a powerful, agnostic tool for integrating **WSO2 Identity Server** with clean architectures. Version **2.0.0 (Security Core)** raises the security standard by implementing cryptographic validation and compliance with modern standards (SPAs/Mobile).
 
 ## 🛡️ What's New in v2 (Proactive Security)
-<<<<<<< HEAD
 
-<<<<<<< HEAD
-[![GitHub Repository](https://img.shields.io/badge/GitHub-Repository-blue?logo=github)](https://github.com/JoySky352/Novashield-wso2.git)
-
-This version (v2.0.0+) introduces significant security improvements, including cryptographic token validation and **optional** PKCE support.
-=======
-=======
-
->>>>>>> a42a46a (Add)
 1.  **JWT Signature Validation (JWKS)**: No longer blindly trusts the token payload. The SDK connects to WSO2 and automatically verifies cryptographic token signatures.
 2.  **Native PKCE Support**: Includes `code_verifier` and `code_challenge` (S256) generators to protect applications against code interception.
 3.  **Custom Error Hierarchy**: Granular errors like `Wso2AuthenticationError`, `Wso2TokenError`, and `Wso2SignatureError` for precise exception handling.
 4.  **OIDC Compliance**: Extended support for verifiable issuers (`iss`) and audiences (`aud`).
-<<<<<<< HEAD
->>>>>>> 953d170 (fix)
-=======
->>>>>>> a42a46a (Add)
 
 ## Installation
 
@@ -87,44 +74,10 @@ try {
 
 ## Architectural Benefits
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-## 📋 Method Summary
-
-| Method                                     | Description                                        |
-| ------------------------------------------ | -------------------------------------------------- |
-| `getAuthorizationUrl(state, challenge?)`   | Generates the URL to initiate the OIDC flow.       |
-| `handleCallback(code, verifier?)`          | Exchanges the code for tokens and user profile.    |
-| `getLogoutUrl(idTokenHint, postLogoutUri)` | Generates the logout URL.                          |
-| `getAppAccessToken()`                      | Obtains an application token (Client Credentials). |
-| `getUserInfo(accessToken)`                 | Queries the WSO2 `/scim2/Me` endpoint.             |
-
----
-
-> > > > > > > a8951fd (docs(sdk): add github repository reference and contributing guide)
-
-## 🤝 Contributing
-
-This SDK is open source and hosted on GitHub. We welcome contributions, bug reports, and feature requests.
-
-Explore the source code and contribute:
-👉 **[JoySky352/Novashield-wso2](https://github.com/JoySky352/Novashield-wso2.git)**
-=======
 1.  **Typed Generics (`TUser`, `TPermissions`)**: Adaptable to any domain model.
 2.  **Network Abstraction**: Separates the "dirty work" of HTTPS requests and Base64 decoding from your business logic.
 3.  **Strategy Providers**: Inject your own `UserMapperProvider` to decide how to map WSO2 claims to your local user.
->>>>>>> 953d170 (fix)
-=======
-1.  **Typed Generics (`TUser`, `TPermissions`)**: Adaptable to any domain model.
-2.  **Network Abstraction**: Separates the "dirty work" of HTTPS requests and Base64 decoding from your business logic.
-3.  **Strategy Providers**: Inject your own `UserMapperProvider` to decide how to map WSO2 claims to your local user.
->>>>>>> a42a46a (Add)
 
 ---
 
-# <<<<<<< HEAD
-
-> > > > > > > # 0b53413 (feat: integrate novashield-wso2 SDK v2)
-> > > > > > >
-> > > > > > > a8951fd (docs(sdk): add github repository reference and contributing guide)
-> > > > > > > Developed with ❤️ by the **NovaShield** team.
+Developed with ❤️ by the **NovaShield** team.
