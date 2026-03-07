@@ -1,43 +1,43 @@
 # @novashield352/novashield-wso2 (v2.0.0)
 
-El SDK de **NovaShield** es una herramienta potente y agnóstica para integrar **WSO2 Identity Server** con arquitecturas limpias. La versión **2.0.0 (Security Core)** eleva el estándar de seguridad implementando validación criptográfica y cumplimiento de estándares modernos (SPAs/Mobile).
+The **NovaShield** SDK is a powerful, agnostic tool for integrating **WSO2 Identity Server** with clean architectures. Version **2.0.0 (Security Core)** raises the security standard by implementing cryptographic validation and compliance with modern standards (SPAs/Mobile).
 
-## 🛡️ Novedades v2 (Seguridad Proactiva)
+## 🛡️ What's New in v2 (Proactive Security)
 
-1.  **Validación de Firmas JWT (JWKS)**: Ya no se confía ciegamente en el payload del token. El SDK se conecta a WSO2 y verifica las firmas criptográficas de los tokens automáticamente.
-2.  **Soporte Nativo PKCE**: Incluye generadores de `code_verifier` y `code_challenge` (S256) para proteger aplicaciones contra interceptación de códigos.
-3.  **Jerarquía de Errores Custom**: Errores granulares como `Wso2AuthenticationError`, `Wso2TokenError` y `Wso2SignatureError` para un manejo de excepciones preciso.
-4.  **OIDC Compliance**: Soporte extendido para emisores (`iss`) y audiencias (`aud`) verificables.
+1.  **JWT Signature Validation (JWKS)**: No longer blindly trusts the token payload. The SDK connects to WSO2 and automatically verifies cryptographic token signatures.
+2.  **Native PKCE Support**: Includes `code_verifier` and `code_challenge` (S256) generators to protect applications against code interception.
+3.  **Custom Error Hierarchy**: Granular errors like `Wso2AuthenticationError`, `Wso2TokenError`, and `Wso2SignatureError` for precise exception handling.
+4.  **OIDC Compliance**: Extended support for verifiable issuers (`iss`) and audiences (`aud`).
 
-## Instalación
+## Installation
 
 ```bash
 yarn add @novashield352/novashield-wso2
-# O vía npm
+# Or via npm
 npm install @novashield352/novashield-wso2
 ```
 
-## Configuración Extendida (v2)
+## Extended Configuration (v2)
 
-Para habilitar la validación de firmas, es vital configurar el `jwksUrl`.
+To enable signature validation, configuring the `jwksUrl` is essential.
 
 ```typescript
 const config = {
   baseUrl: "https://is-dev.novabank.global",
   clientId: "YOUR_CLIENT_ID",
-  clientSecret: "YOUR_CLIENT_SECRET", // Opcional si solo usas PKCE
+  clientSecret: "YOUR_CLIENT_SECRET",
   callbackUrl: "http://localhost:5173/callback",
-  jwksUrl: "https://is-dev.novabank.global/oauth2/jwks", // Requerido para validación v2
-  issuer: "https://is-dev.novabank.global/oauth2/token", // Requerido para verificación 'iss'
+  jwksUrl: "https://is-dev.novabank.global/oauth2/jwks",
+  issuer: "https://is-dev.novabank.global/oauth2/token",
   rejectUnauthorized: false,
 };
 ```
 
-## Uso del Flujo v2 con PKCE
+## Using the v2 Flow with PKCE
 
-Si estás construyendo una aplicación moderna que requiere el máximo nivel de seguridad:
+If you're building a modern application that requires the highest level of security:
 
-### 1. Generar URL de Redirección (con PKCE)
+### 1. Generate Redirect URL (with PKCE)
 
 ```typescript
 import {
@@ -49,36 +49,35 @@ import {
 const verifier = generateCodeVerifier();
 const challenge = await generateCodeChallenge(verifier);
 
-// Importante: Guarda el verifier en la sesión del usuario para el siguiente paso
 session.codeVerifier = verifier;
 
 const authUrl = wso2Client.getAuthorizationUrl("secure_state", challenge);
 ```
 
-### 2. Procesar el Callback
+### 2. Process the Callback
 
 ```typescript
 try {
   const { user, tokens } = await wso2Client.handleCallback(
     req.query.code,
-    session.codeVerifier, // Pasa el verifier aquí
+    session.codeVerifier, // Pass the verifier here
   );
 
-  // En v2, si jwksUrl está configurado, la firma del id_token ya fue validada.
-  console.log("Acceso concedido a:", user.name);
+  // In v2, if jwksUrl is configured, the id_token signature has already been validated.
+  console.log("Access granted to:", user.name);
 } catch (error) {
   if (error instanceof Wso2SignatureError) {
-    console.error("ALERTA DE SEGURIDAD: Token con firma inválida.");
+    console.error("SECURITY ALERT: Token with invalid signature.");
   }
 }
 ```
 
-## Beneficios de Arquitectura
+## Architectural Benefits
 
-1.  **Genéricos Tipados (`TUser`, `TPermissions`)**: Adaptable a cualquier modelo de dominio.
-2.  **Abstracción de Red**: Separa la "suciedad" de las peticiones HTTPS y decodificaciones Base64 de tu lógica de negocio.
-3.  **Proveedores de Estrategia**: Inyecta tu propio `UserMapperProvider` para decidir cómo mapear los claims de WSO2 a tu usuario local.
+1.  **Typed Generics (`TUser`, `TPermissions`)**: Adaptable to any domain model.
+2.  **Network Abstraction**: Separates the "dirty work" of HTTPS requests and Base64 decoding from your business logic.
+3.  **Strategy Providers**: Inject your own `UserMapperProvider` to decide how to map WSO2 claims to your local user.
 
 ---
 
-Desarrollado con ❤️ por el equipo de **NovaShield**.
+Developed with ❤️ by the **NovaShield** team.
