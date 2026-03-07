@@ -9,8 +9,7 @@ import {
     Wso2AuthenticationError,
     Wso2NetworkError,
     Wso2SignatureError,
-    Wso2TokenError,
-    Wso2BaseError
+    Wso2TokenError
 } from "../errors";
 
 /**
@@ -190,4 +189,5 @@ export class NovashieldAuthClient<TUser = any, TPermissions = any> {
         }
     }
 }
+import { Wso2BaseError } from "../errors";
 

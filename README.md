@@ -1,81 +1,60 @@
-# @novashield352/novashield-wso2
+# @novashield352/novashield-wso2 (v2.0.0)
 
-**NovaShield** is a powerful, agnostic SDK designed to integrate **WSO2 Identity Server** into Node.js/TypeScript applications following clean architecture principles.
+The **NovaShield** SDK is a powerful, agnostic tool for integrating **WSO2 Identity Server** with clean architectures. Version **2.0.0 (Security Core)** raises the security standard by implementing cryptographic validation and compliance with modern standards (SPAs/Mobile).
+
+## 🛡️ What's New in v2 (Proactive Security)
+<<<<<<< HEAD
+
+<<<<<<< HEAD
+[![GitHub Repository](https://img.shields.io/badge/GitHub-Repository-blue?logo=github)](https://github.com/JoySky352/Novashield-wso2.git)
 
 This version (v2.0.0+) introduces significant security improvements, including cryptographic token validation and **optional** PKCE support.
+=======
+=======
 
----
+>>>>>>> a42a46a (Add)
+1.  **JWT Signature Validation (JWKS)**: No longer blindly trusts the token payload. The SDK connects to WSO2 and automatically verifies cryptographic token signatures.
+2.  **Native PKCE Support**: Includes `code_verifier` and `code_challenge` (S256) generators to protect applications against code interception.
+3.  **Custom Error Hierarchy**: Granular errors like `Wso2AuthenticationError`, `Wso2TokenError`, and `Wso2SignatureError` for precise exception handling.
+4.  **OIDC Compliance**: Extended support for verifiable issuers (`iss`) and audiences (`aud`).
+<<<<<<< HEAD
+>>>>>>> 953d170 (fix)
+=======
+>>>>>>> a42a46a (Add)
 
-## 🚀 Installation
+## Installation
 
 ```bash
-npm install @novashield352/novashield-wso2
-# or
 yarn add @novashield352/novashield-wso2
+# Or via npm
+npm install @novashield352/novashield-wso2
 ```
 
----
+## Extended Configuration (v2)
 
-## ⚙️ Basic Configuration
-
-To get started, you need to configure the client with your WSO2 Service Provider credentials.
+To enable signature validation, configuring the `jwksUrl` is essential.
 
 ```typescript
-import { NovashieldAuthClient } from "@novashield352/novashield-wso2";
-
 const config = {
-  baseUrl: "https://is.your-domain.com",
+  baseUrl: "https://is-dev.novabank.global",
   clientId: "YOUR_CLIENT_ID",
-  clientSecret: "YOUR_CLIENT_SECRET", // Optional if using public flows
-  callbackUrl: "https://your-app.com/callback",
-  jwksUrl: "https://is.your-domain.com/oauth2/jwks", // Recommended for token validation
-  issuer: "https://is.your-domain.com/oauth2/token",
-  rejectUnauthorized: true, // Set to false only in local development
+  clientSecret: "YOUR_CLIENT_SECRET",
+  callbackUrl: "http://localhost:5173/callback",
+  jwksUrl: "https://is-dev.novabank.global/oauth2/jwks",
+  issuer: "https://is-dev.novabank.global/oauth2/token",
+  rejectUnauthorized: false,
 };
-
-// You'll need a Mapper to transform WSO2 data into your user model
-const userMapper = {
-  fromIdToken: (payload: any) => ({
-    id: payload.sub,
-    email: payload.email,
-    name: payload.preferred_username,
-  }),
-};
-
-const authClient = new NovashieldAuthClient(config, userMapper);
 ```
 
----
+## Using the v2 Flow with PKCE
 
-## 🔐 Authentication Flows
+If you're building a modern application that requires the highest level of security:
 
-### 1. Standard Usage (Without PKCE)
-
-Ideal for server-to-server applications or where basic security is sufficient.
-
-**Step A: Redirect to Login**
-
-```typescript
-const state = "random-value-to-prevent-csrf";
-const loginUrl = authClient.getAuthorizationUrl(state);
-// Redirect the user to loginUrl
-```
-
-**Step B: Handle the Callback**
-
-```typescript
-const { tokens, user } = await authClient.handleCallback(req.query.code);
-console.log("Welcome:", user.name);
-```
-
-### 2. PKCE Usage (Optional - Recommended)
-
-Recommended for Single Page Applications (SPA) and mobile apps to prevent authorization code interception.
-
-**Step A: Generate Challenge and Verifier**
+### 1. Generate Redirect URL (with PKCE)
 
 ```typescript
 import {
+  NovashieldAuthClient,
   generateCodeVerifier,
   generateCodeChallenge,
 } from "@novashield352/novashield-wso2";
@@ -83,86 +62,33 @@ import {
 const verifier = generateCodeVerifier();
 const challenge = await generateCodeChallenge(verifier);
 
-// IMPORTANT: Save the 'verifier' in the session or a secure cookie before redirecting
 session.codeVerifier = verifier;
 
-const authUrl = authClient.getAuthorizationUrl("my-state", challenge);
+const authUrl = wso2Client.getAuthorizationUrl("secure_state", challenge);
 ```
 
-**Step B: Process the Callback with Verifier**
-
-```typescript
-const verifier = session.codeVerifier;
-const { tokens, user } = await authClient.handleCallback(
-  req.query.code,
-  verifier,
-);
-```
-
----
-
-## 🛠️ Advanced Customization
-
-### Implementing a UserMapperProvider
-
-You can create a class to handle user transformation more robustly.
-
-```typescript
-import { UserMapperProvider } from "@novashield352/novashield-wso2";
-
-class MyUserMapper implements UserMapperProvider<MyUserType> {
-  fromIdToken(payload: any): MyUserType {
-    return {
-      uuid: payload.sub,
-      email: payload.email,
-      roles: payload.groups || [],
-    };
-  }
-}
-```
-
-### Permission Management
-
-If your application needs to load additional permissions after login:
-
-```typescript
-const permissionProvider = {
-  getPermissions: async (user, accessToken) => {
-    // Logic to fetch permissions from a DB or API
-    return ["READ_DOCS", "WRITE_DOCS"];
-  },
-};
-
-const authClient = new NovashieldAuthClient(
-  config,
-  userMapper,
-  permissionProvider,
-);
-```
-
----
-
-## ⚠️ Error Handling
-
-The library uses an error hierarchy to facilitate exception handling:
-
-- `Wso2AuthenticationError`: General errors in the code exchange process.
-- `Wso2TokenError`: The received token is invalid or malformed.
-- `Wso2SignatureError`: **Critical.** The JWT cryptographic signature could not be validated.
-- `Wso2NetworkError`: Connection issues with the WSO2 server.
+### 2. Process the Callback
 
 ```typescript
 try {
-  await authClient.handleCallback(code);
+  const { user, tokens } = await wso2Client.handleCallback(
+    req.query.code,
+    session.codeVerifier, // Pass the verifier here
+  );
+
+  // In v2, if jwksUrl is configured, the id_token signature has already been validated.
+  console.log("Access granted to:", user.name);
 } catch (error) {
   if (error instanceof Wso2SignatureError) {
-    // Possible attack or expired WSO2 certificate
+    console.error("SECURITY ALERT: Token with invalid signature.");
   }
 }
 ```
 
----
+## Architectural Benefits
 
+<<<<<<< HEAD
+<<<<<<< HEAD
 ## 📋 Method Summary
 
 | Method                                     | Description                                        |
@@ -175,4 +101,30 @@ try {
 
 ---
 
-Developed with ❤️ by the **NovaShield** team.
+> > > > > > > a8951fd (docs(sdk): add github repository reference and contributing guide)
+
+## 🤝 Contributing
+
+This SDK is open source and hosted on GitHub. We welcome contributions, bug reports, and feature requests.
+
+Explore the source code and contribute:
+👉 **[JoySky352/Novashield-wso2](https://github.com/JoySky352/Novashield-wso2.git)**
+=======
+1.  **Typed Generics (`TUser`, `TPermissions`)**: Adaptable to any domain model.
+2.  **Network Abstraction**: Separates the "dirty work" of HTTPS requests and Base64 decoding from your business logic.
+3.  **Strategy Providers**: Inject your own `UserMapperProvider` to decide how to map WSO2 claims to your local user.
+>>>>>>> 953d170 (fix)
+=======
+1.  **Typed Generics (`TUser`, `TPermissions`)**: Adaptable to any domain model.
+2.  **Network Abstraction**: Separates the "dirty work" of HTTPS requests and Base64 decoding from your business logic.
+3.  **Strategy Providers**: Inject your own `UserMapperProvider` to decide how to map WSO2 claims to your local user.
+>>>>>>> a42a46a (Add)
+
+---
+
+# <<<<<<< HEAD
+
+> > > > > > > # 0b53413 (feat: integrate novashield-wso2 SDK v2)
+> > > > > > >
+> > > > > > > a8951fd (docs(sdk): add github repository reference and contributing guide)
+> > > > > > > Developed with ❤️ by the **NovaShield** team.
