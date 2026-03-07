@@ -1,0 +1,19 @@
+{
+  "name": "@novashield352/novashield-wso2",
+  "version": "1.0.1",
+  "description": "SDK agnóstico para integración con WSO2 Identity Server y manejo de permisos genéricos",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "dayjs": "^1.11.10"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "author": "NovaShield",
+  "license": "ISC"
+}
