@@ -1,18 +1,24 @@
 import axios, { AxiosInstance } from "axios";
 import https from "https";
 import dayjs from "dayjs";
+import * as jose from "jose";
 import { AccessTokenResponse, AuthenticationResult, Wso2ClientConfig } from "../types";
 import { UserMapperProvider } from "../providers/user-mapper.provider";
 import { PermissionProvider } from "../providers/permission.provider";
+import {
+    Wso2AuthenticationError,
+    Wso2NetworkError,
+    Wso2SignatureError,
+    Wso2TokenError
+} from "../errors";
 
 /**
- * Generic Framework-Agnostic Client for WSO2 Identity Server
- *
- * It decouples the WSO2 specifics into an injectable class, standardizing the OAuth2/OIDC flows
- * while allowing generic typings for internal domain users (TUser) and permissions (TPermissions).
+ * NovashieldAuthClient v2
+ * Standard OIDC Client with PKCE and JWT Signature Validation
  */
 export class NovashieldAuthClient<TUser = any, TPermissions = any> {
     private httpClient: AxiosInstance;
+    private jwksRemote: any | null = null;
 
     private appAccessToken: string | null = null;
     private appExpiresAt: dayjs.Dayjs | null = null;
@@ -29,12 +35,17 @@ export class NovashieldAuthClient<TUser = any, TPermissions = any> {
             }),
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
         });
+
+        if (this.config.jwksUrl) {
+            this.jwksRemote = jose.createRemoteJWKSet(new URL(this.config.jwksUrl));
+        }
     }
 
     /**
-     * Generates the OAuth2 Authorization string URL for the frontend redirection.
+     * Generates the OAuth2 Authorization URL.
+     * v2: Supports PKCE (code_challenge).
      */
-    public getAuthorizationUrl(state: string, prompt?: string): string {
+    public getAuthorizationUrl(state: string, codeChallenge?: string, prompt?: string): string {
         const params = new URLSearchParams({
             client_id: this.config.clientId,
             redirect_uri: this.config.callbackUrl || "",
@@ -42,14 +53,21 @@ export class NovashieldAuthClient<TUser = any, TPermissions = any> {
             scope: this.config.scope || "openid profile email",
             state,
         });
+
+        if (codeChallenge) {
+            params.append("code_challenge", codeChallenge);
+            params.append("code_challenge_method", "S256");
+        }
+
         if (prompt) {
             params.append("prompt", prompt);
         }
+
         return `${this.config.baseUrl}/oauth2/authorize?${params.toString()}`;
     }
 
     /**
-     * Constructs the OIDC standard logout URL
+     * Constructs the OIDC logout URL.
      */
     public getLogoutUrl(idTokenHint: string, postLogoutRedirectUri: string): string {
         const params = new URLSearchParams({
@@ -60,10 +78,10 @@ export class NovashieldAuthClient<TUser = any, TPermissions = any> {
     }
 
     /**
-     * Exchanges an authorization code for tokens, maps the ID Token to the generic user model `TUser`,
-     * and optionally fetches/maps the permissions.
+     * Exchanges code for tokens.
+     * v2: Supports PKCE (code_verifier) and JWT validation.
      */
-    public async handleCallback(code: string): Promise<AuthenticationResult<TUser, TPermissions>> {
+    public async handleCallback(code: string, codeVerifier?: string): Promise<AuthenticationResult<TUser, TPermissions>> {
         try {
             const tokenBody: Record<string, string> = {
                 grant_type: "authorization_code",
@@ -71,48 +89,67 @@ export class NovashieldAuthClient<TUser = any, TPermissions = any> {
                 code,
             };
 
+            if (codeVerifier) {
+                tokenBody.code_verifier = codeVerifier;
+            }
+
             const requestConfig: Record<string, any> = {};
             if (this.config.clientSecret) {
-                console.log("[Novashield WSO2] Using Basic Auth for token exchange (confidential client)");
                 requestConfig.auth = {
                     username: this.config.clientId,
                     password: this.config.clientSecret,
                 };
             } else {
-                console.log("[Novashield WSO2] Using public client (client_id in body)");
                 tokenBody.client_id = this.config.clientId;
             }
 
-            const tokenResponse = await this.httpClient.post<AccessTokenResponse>("/oauth2/token", tokenBody, requestConfig);
+            const response = await this.httpClient.post<AccessTokenResponse>("/oauth2/token", tokenBody, requestConfig);
+            const tokens = response.data;
 
-            const tokens = tokenResponse.data;
             if (!tokens.id_token) {
-                throw new Error("WSO2 did not return an ID token");
+                throw new Wso2TokenError("Missing id_token in WSO2 response");
             }
 
-            const idTokenPayload = JSON.parse(Buffer.from(tokens.id_token.split(".")[1], "base64").toString());
+            // v2: Crypto Verification of JWT
+            let idTokenPayload: any;
+            if (this.jwksRemote) {
+                try {
+                    const { payload } = await jose.jwtVerify(tokens.id_token, this.jwksRemote, {
+                        issuer: this.config.issuer,
+                        audience: this.config.clientId,
+                    });
+                    idTokenPayload = payload;
+                } catch (e: any) {
+                    throw new Wso2SignatureError(`JWT Signature verification failed: ${e.message}`);
+                }
+            } else {
+                console.warn("[Novashield WSO2] Warning: Decoding ID Token without signature verification (jwksUrl not configured)");
+                idTokenPayload = jose.decodeJwt(tokens.id_token);
+            }
 
             const user = this.userMapper.fromIdToken(idTokenPayload);
 
-            let permissions: TPermissions | undefined = undefined;
+            let permissions: TPermissions | undefined;
             if (this.permissionProvider) {
                 permissions = await this.permissionProvider.getPermissions(user, tokens.access_token);
             }
 
-            return {
-                tokens,
-                user,
-                permissions
-            };
+            return { tokens, user, permissions };
+
         } catch (error: any) {
-            console.error("[Novashield WSO2] Error exchanging code:", error.response?.data || error.message);
-            throw new Error(`Failed to exchange code: ${error.message}`);
+            if (error instanceof Wso2BaseError) throw error;
+
+            if (axios.isAxiosError(error)) {
+                const wso2Error = error.response?.data?.error || error.message;
+                throw new Wso2AuthenticationError(`Failed to exchange code: ${wso2Error}`, error.response?.data);
+            }
+
+            throw new Wso2NetworkError(`Unexpected error during callback: ${error.message}`);
         }
     }
 
     /**
-     * Uses Client Credentials grant to obtain an App Access Token. 
-     * It handles caching automatically based on expiration time.
+     * Client Credentials Grant
      */
     public async getAppAccessToken(): Promise<string> {
         const now = dayjs();
@@ -129,30 +166,28 @@ export class NovashieldAuthClient<TUser = any, TPermissions = any> {
             });
 
             const { access_token, expires_in } = response.data;
-
             this.appAccessToken = access_token;
             this.appExpiresAt = dayjs().add(expires_in - 10, "second");
 
             return access_token;
         } catch (error: any) {
-            console.error("[Novashield WSO2] Client Credentials error:", error.response?.data || error.message);
-            throw new Error("Failed to get client credentials token");
+            throw new Wso2NetworkError("Failed to obtain app access token", error.response?.data);
         }
     }
 
     /**
-     * Fetches the /scim2/Me endpoint to update or grab extended user information in a pure JSON shape.
+     * Extended User Info (SCIM)
      */
     public async getUserInfo(accessToken: string): Promise<any> {
         try {
-            const response = await axios.get(`${this.config.baseUrl}/scim2/Me`, {
-                headers: { Authorization: `Bearer ${accessToken}` },
-                httpsAgent: new https.Agent({ rejectUnauthorized: this.config.rejectUnauthorized ?? true })
+            const response = await this.httpClient.get("/scim2/Me", {
+                headers: { Authorization: `Bearer ${accessToken}` }
             });
             return response.data;
         } catch (error: any) {
-            console.error("[Novashield WSO2] getUserInfo error:", error.response?.data || error.message);
-            throw error;
+            throw new Wso2NetworkError("Failed to fetch extended user info", error.response?.data);
         }
     }
 }
+import { Wso2BaseError } from "../errors";
+

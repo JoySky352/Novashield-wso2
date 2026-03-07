@@ -1,106 +1,84 @@
-# @novashield352/novashield-wso2
+# @novashield352/novashield-wso2 (v2.0.0)
 
-Este es el SDK oficial de **NovaShield** diseñado para manejar la integración con **WSO2 Identity Server** utilizando metodologías de arquitectura limpia. Es completamente agnóstico al framework subyacente (Express, NestJS, FastAPI backend, etc.).
+El SDK de **NovaShield** es una herramienta potente y agnóstica para integrar **WSO2 Identity Server** con arquitecturas limpias. La versión **2.0.0 (Security Core)** eleva el estándar de seguridad implementando validación criptográfica y cumplimiento de estándares modernos (SPAs/Mobile).
+
+## 🛡️ Novedades v2 (Seguridad Proactiva)
+
+1.  **Validación de Firmas JWT (JWKS)**: Ya no se confía ciegamente en el payload del token. El SDK se conecta a WSO2 y verifica las firmas criptográficas de los tokens automáticamente.
+2.  **Soporte Nativo PKCE**: Incluye generadores de `code_verifier` y `code_challenge` (S256) para proteger aplicaciones contra interceptación de códigos.
+3.  **Jerarquía de Errores Custom**: Errores granulares como `Wso2AuthenticationError`, `Wso2TokenError` y `Wso2SignatureError` para un manejo de excepciones preciso.
+4.  **OIDC Compliance**: Soporte extendido para emisores (`iss`) y audiencias (`aud`) verificables.
 
 ## Instalación
 
 ```bash
+yarn add @novashield352/novashield-wso2
+# O vía npm
 npm install @novashield352/novashield-wso2
 ```
 
-## Beneficios
+## Configuración Extendida (v2)
 
-1. **Genéricos Tipados (`TUser`, `TPermissions`)**: Ya no estás atado a una interfaz estricta. El módulo se adapta a tu modelo de dominio pasándole tus propias interfaces TypeScript.
-2. **Inyección de Dependencias**: Sigue los principios SOLID separando la responsabilidad de Mapeo de Usuario (`UserMapperProvider`) y Resolución de Permisos (`PermissionProvider`).
-3. **Manejo Centralizado de Tokens**: Abstrae completamente los Access Tokens de WSO2, el token de Client Credentials (`AppAccessToken`) y el manejo de sesiones en JWT firmados.
+Para habilitar la validación de firmas, es vital configurar el `jwksUrl`.
 
-## Uso Avanzado en tu Framework (Ej. NestJS o Express)
+```typescript
+const config = {
+  baseUrl: "https://is-dev.novabank.global",
+  clientId: "YOUR_CLIENT_ID",
+  clientSecret: "YOUR_CLIENT_SECRET", // Opcional si solo usas PKCE
+  callbackUrl: "http://localhost:5173/callback",
+  jwksUrl: "https://is-dev.novabank.global/oauth2/jwks", // Requerido para validación v2
+  issuer: "https://is-dev.novabank.global/oauth2/token", // Requerido para verificación 'iss'
+  rejectUnauthorized: false,
+};
+```
 
-### Paso 1: Crea tus modelos e Inyectores de Dependencia
+## Uso del Flujo v2 con PKCE
 
-El SDK delega a tu aplicación definir qué es un usuario. Implementa las interfaces provistas:
+Si estás construyendo una aplicación moderna que requiere el máximo nivel de seguridad:
+
+### 1. Generar URL de Redirección (con PKCE)
 
 ```typescript
 import {
-  UserMapperProvider,
-  PermissionProvider,
+  NovashieldAuthClient,
+  generateCodeVerifier,
+  generateCodeChallenge,
 } from "@novashield352/novashield-wso2";
 
-// Tus interfaces locales
-export interface MyUserShape {
-  id: string;
-  email: string;
-  groups: string[];
-}
-export interface MyPermissionsShape {
-  posIds: string[];
-  orgIds: string[];
-}
+const verifier = generateCodeVerifier();
+const challenge = await generateCodeChallenge(verifier);
 
-export class Wso2UserMapper implements UserMapperProvider<MyUserShape> {
-  fromIdToken(idTokenPayload: any): MyUserShape {
-    return {
-      id: idTokenPayload.sub,
-      email: idTokenPayload.email,
-      groups: idTokenPayload.groups || [],
-    };
-  }
+// Importante: Guarda el verifier en la sesión del usuario para el siguiente paso
+session.codeVerifier = verifier;
 
-  fromUserInfo(userInfo: any): MyUserShape {
-    /*...*/
-  }
-}
-
-export class Wso2PermissionProvider implements PermissionProvider<
-  MyUserShape,
-  MyPermissionsShape
-> {
-  // Aquí puedes inyectar tus repositorios locales, llamadas de BD o APIs
-  async getPermissions(
-    user: MyUserShape,
-    accessToken: string,
-  ): Promise<MyPermissionsShape> {
-    // Ejemplo: buscar roles en AM
-    return { posIds: [], orgIds: [] };
-  }
-}
+const authUrl = wso2Client.getAuthorizationUrl("secure_state", challenge);
 ```
 
-### Paso 2: Inicializa el Cliente
+### 2. Procesar el Callback
 
 ```typescript
-import { NovashieldAuthClient } from "@novashield352/novashield-wso2";
+try {
+  const { user, tokens } = await wso2Client.handleCallback(
+    req.query.code,
+    session.codeVerifier, // Pasa el verifier aquí
+  );
 
-const config = {
-  baseUrl: process.env.IS_URL,
-  clientId: process.env.IS_CLIENT_KEY,
-  clientSecret: process.env.IS_CLIENT_SECRET,
-  callbackUrl: process.env.IS_SPA_CALLBACK_URL,
-  rejectUnauthorized: false,
-};
-
-const wso2Client = new NovashieldAuthClient<MyUserShape, MyPermissionsShape>(
-  config,
-  new Wso2UserMapper(),
-  new Wso2PermissionProvider(), // Opcional
-);
+  // En v2, si jwksUrl está configurado, la firma del id_token ya fue validada.
+  console.log("Acceso concedido a:", user.name);
+} catch (error) {
+  if (error instanceof Wso2SignatureError) {
+    console.error("ALERTA DE SEGURIDAD: Token con firma inválida.");
+  }
+}
 ```
 
-### Paso 3: Úsalo en tus controladores
+## Beneficios de Arquitectura
 
-```typescript
-// En vez de tener lógica acoplada de axios en tus controladores:
+1.  **Genéricos Tipados (`TUser`, `TPermissions`)**: Adaptable a cualquier modelo de dominio.
+2.  **Abstracción de Red**: Separa la "suciedad" de las peticiones HTTPS y decodificaciones Base64 de tu lógica de negocio.
+3.  **Proveedores de Estrategia**: Inyecta tu propio `UserMapperProvider` para decidir cómo mapear los claims de WSO2 a tu usuario local.
 
-// Generar URL de Redirección (SSO Login)
-const authUrl = wso2Client.getAuthorizationUrl("some_secure_state");
+---
 
-// Procesar el Callback (OIDC Exchange)
-const { user, tokens, permissions } = await wso2Client.handleCallback(
-  req.query.code,
-);
-
-// Llamada server-to-server (App Token)
-const ccToken = await wso2Client.getAppAccessToken();
-```
-
-Esto separa la suciedad de la red HTTPS, validación de schemas de WSO2 y decodificación base64, dejándote con una Lógica de Aplicación pura y profesional.
+Desarrollado con ❤️ por el equipo de **NovaShield**.
