@@ -4,3 +4,6 @@ export * from "./providers/permission.provider";
 export * from "./core/client";
 export * from "./errors";
 export * from "./utils/pkce";
+export * from "./utils/discovery";
+export * from "./utils/logger";
+export * from "./utils/config-validator";

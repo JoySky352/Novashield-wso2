@@ -44,3 +44,11 @@ export class Wso2SignatureError extends Wso2TokenError {
         super(message, details);
     }
 }
+/**
+ * Thrown when the configuration provided to the SDK is invalid
+ */
+export class Wso2ConfigurationError extends Wso2BaseError {
+    constructor(message: string, details?: any) {
+        super(message, details);
+    }
+}

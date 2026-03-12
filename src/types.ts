@@ -15,6 +15,8 @@ export interface Wso2ClientConfig {
     issuer?: string;
 
     rejectUnauthorized?: boolean;
+    debug?: boolean;
+    autoDiscovery?: boolean;
 }
 
 export interface AccessTokenResponse {
