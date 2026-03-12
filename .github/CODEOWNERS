@@ -1,0 +1,8 @@
+# Los code owners son responsables del código
+* @JoySky352
+
+# Áreas específicas
+/src/core/ @JoySky352
+/src/utils/ @JoySky352
+/tests/ @JoySky352
+/docs/ @JoySky352
