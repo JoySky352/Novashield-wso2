@@ -17,6 +17,8 @@ export interface Wso2ClientConfig {
     rejectUnauthorized?: boolean;
     debug?: boolean;
     autoDiscovery?: boolean;
+    /** Clock skew tolerance for JWT validation (in seconds) */
+    clockTolerance?: number;
 }
 
 export interface AccessTokenResponse {

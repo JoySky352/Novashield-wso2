@@ -182,6 +182,7 @@ export class NovashieldAuthClient<TUser = any, TPermissions = any> {
                     const { payload } = await jose.jwtVerify(tokens.id_token, this.jwksRemote, {
                         issuer: this.config.issuer,
                         audience: this.config.clientId,
+                        clockTolerance: this.config.clockTolerance || 30,
                     });
                     idTokenPayload = payload;
                 } catch (e: any) {
